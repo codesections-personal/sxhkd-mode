@@ -1,5 +1,5 @@
 [package]
-name = "xpra-home"
+name = "sxhkd-mode"
 version = "0.1.0"
 authors = ["Daniel Sockwell <dsockwell@gmail.com>"]
 edition = "2018"
@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 clap = { git = "https://github.com/clap-rs/clap" }
-run_script = "0.3.2"
 strum = "0.16.0"
 strum_macros = "0.16.0"
+utils = {path = "../utils"}
+serde = "1.0.104"
