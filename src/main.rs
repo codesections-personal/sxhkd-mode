@@ -1,19 +1,15 @@
 use clap::{crate_name, crate_version, App, Arg};
-use std::str::FromStr;
-use strum_macros::{Display, EnumString, EnumVariantNames};
-use utils::{dependencies, sh};
-
-#[derive(EnumString, Display, EnumVariantNames)]
-enum Modes {
-    Emacs,
-    Fundemental,
-    APL,
-    Firefox,
-}
+use config;
+use regex::Regex;
+use std::collections::HashMap;
+use utils::{dependencies, die_with_msg, sh};
 
 fn main() {
     let matches = App::new(crate_name!())
-        .about("Update the current_mode symlink to the specified sxhkd mode file.")
+        .about(
+            "Check the provided MODE against the rules listed in the configuration file.  \
+             If a match is found, set the current sxhkd mode to the mode specified in that rule.",
+        )
         .version(crate_version!())
         .arg(
             Arg::with_name("MODE")
@@ -23,22 +19,36 @@ fn main() {
         .get_matches();
     dependencies(crate_name!(), &["ln", "pkill"]);
 
-    let mut mode = matches.value_of("MODE").expect("required");
-    if mode.contains("Mozilla Firefox") || mode.contains("TigerVNC") {
-        mode = "Firefox"
-    };
+    let mut settings = config::Config::new();
+    settings
+        .merge(config::File::with_name(
+            "/home/dsock/.config/sxhkd/modes.toml",
+        ))
+        .unwrap_or_else(|_| die_with_msg("Invalid configuration file"));
+    let settings = settings.try_into::<HashMap<String, String>>().unwrap();
 
-    let mode = Modes::from_str(mode).unwrap_or(Modes::Fundemental);
-    let target_mode = match mode {
-        Modes::Emacs => "emacs_mode",
-        Modes::APL => "apl_mode",
-        Modes::Firefox => "firefox_mode",
-        _ => "empty_mode",
-    };
+    let mode = matches.value_of("MODE").expect("required");
+
+    let target_mode = settings
+        .iter()
+        .fold(String::from("empty_mode"), |cur, (key, value)| {
+            let re = Regex::new(value).unwrap();
+            match re.is_match(mode) {
+                true => String::from(key),
+                false => cur,
+            }
+        });
+
+    foo();
+
     sh(&format!(
         r#"ln --symbolic --no-dereference --force {sxhkd_dir}/{mode} {sxhkd_dir}/current_mode"#,
         sxhkd_dir = "/home/dsock/.config/sxhkd",
         mode = target_mode
     ));
     sh("pkill -USR1 -x sxhkd");
+}
+
+fn foo() -> () {
+    println!("bar");
 }
